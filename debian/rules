@@ -1,0 +1,77 @@
+#!/usr/bin/make -f
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+RESTIC_VERSION := $(shell dpkg-parsechangelog -S Version | sed 's/[-~].*//')
+UPSTREAM_URL := https://github.com/restic/restic/releases/download/v$(RESTIC_VERSION)
+# Primary key fingerprint of the restic release key, mirrored in
+# debian/restic-release-key.asc. See https://restic.net/gpg-key-alex.asc
+UPSTREAM_FPR := CF8F18F2844575973F79D4E191A6868BD3F7A907
+WORK := .restic-build
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+# Upstream ships prebuilt static binaries rather than a buildable Go tree here,
+# so the build step downloads the binary for this architecture and verifies it
+# against upstream's OpenPGP-signed SHA256SUMS before anything is unpacked or
+# executed. Both checks are fail-closed.
+override_dh_auto_build:
+	@rm -rf $(WORK) && mkdir -p $(WORK)/man $(WORK)/gnupg && chmod 700 $(WORK)/gnupg
+	@arch="$(DEB_HOST_ARCH)"; \
+	case "$$arch" in \
+		amd64)   goarch=amd64   ;; \
+		arm64)   goarch=arm64   ;; \
+		armhf)   goarch=arm     ;; \
+		i386)    goarch=386     ;; \
+		ppc64el) goarch=ppc64le ;; \
+		s390x)   goarch=s390x   ;; \
+		riscv64) goarch=riscv64 ;; \
+		*) echo "Unsupported architecture: $$arch"; exit 1 ;; \
+	esac; \
+	asset="restic_$(RESTIC_VERSION)_linux_$$goarch.bz2"; \
+	echo "Downloading $$asset for $(RESTIC_VERSION)..."; \
+	wget -q "$(UPSTREAM_URL)/$$asset"          -O "$(WORK)/$$asset"; \
+	wget -q "$(UPSTREAM_URL)/SHA256SUMS"       -O "$(WORK)/SHA256SUMS"; \
+	wget -q "$(UPSTREAM_URL)/SHA256SUMS.asc"   -O "$(WORK)/SHA256SUMS.asc"; \
+	GNUPGHOME=$(WORK)/gnupg gpg --batch --no-tty --quiet \
+		--import debian/restic-release-key.asc; \
+	status="$$(GNUPGHOME=$(WORK)/gnupg gpg --batch --no-tty --status-fd 1 \
+		--verify "$(WORK)/SHA256SUMS.asc" "$(WORK)/SHA256SUMS" 2>/dev/null)" || \
+		{ echo "SHA256SUMS signature does not verify"; exit 1; }; \
+	printf '%s\n' "$$status" | grep -q '^\[GNUPG:\] GOODSIG ' || \
+		{ echo "SHA256SUMS carries no good signature"; exit 1; }; \
+	printf '%s\n' "$$status" | grep -q "^\[GNUPG:\] VALIDSIG .*$(UPSTREAM_FPR)$$" || \
+		{ echo "SHA256SUMS was not signed by the restic release key"; exit 1; }; \
+	echo "SHA256SUMS verified against $(UPSTREAM_FPR)"; \
+	( cd $(WORK) && grep "  $$asset$$" SHA256SUMS | sha256sum -c - ) || \
+		{ echo "Checksum mismatch for $$asset"; exit 1; }; \
+	bunzip2 -c "$(WORK)/$$asset" > "$(WORK)/restic"; \
+	chmod 755 "$(WORK)/restic"; \
+	rm -f "$(WORK)/$$asset" "$(WORK)/SHA256SUMS" "$(WORK)/SHA256SUMS.asc"; \
+	rm -rf "$(WORK)/gnupg"; \
+	"$(WORK)/restic" generate \
+		--man "$(WORK)/man" \
+		--bash-completion "$(WORK)/restic.bash" \
+		--zsh-completion "$(WORK)/_restic" \
+		--fish-completion "$(WORK)/restic.fish"
+
+override_dh_auto_install:
+	install -D -m 755 $(WORK)/restic debian/restic/usr/bin/restic
+	@for page in $(WORK)/man/*.1; do \
+		install -D -m 644 "$$page" "debian/restic/usr/share/man/man1/$$(basename "$$page")"; \
+	done
+	install -D -m 644 $(WORK)/restic.bash debian/restic/usr/share/bash-completion/completions/restic
+	install -D -m 644 $(WORK)/restic.fish debian/restic/usr/share/fish/vendor_completions.d/restic.fish
+	install -D -m 644 $(WORK)/_restic debian/restic/usr/share/zsh/vendor-completions/_restic
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf $(WORK)
+
+override_dh_strip:
+
+override_dh_dwz:
+
+override_dh_shlibdeps:

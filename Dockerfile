@@ -1,0 +1,46 @@
+ARG DEBIAN_DIST=bookworm
+FROM debian:$DEBIAN_DIST
+
+ARG DEBIAN_DIST
+ARG restic_VERSION
+ARG BUILD_VERSION
+ARG FULL_VERSION
+ARG ARCH
+ARG RESTIC_DIR
+
+RUN mkdir -p /output/usr/bin
+RUN mkdir -p /output/usr/share/doc/restic
+RUN mkdir -p /output/usr/share/man/man1
+RUN mkdir -p /output/usr/share/bash-completion/completions
+RUN mkdir -p /output/usr/share/fish/vendor_completions.d
+RUN mkdir -p /output/usr/share/zsh/vendor-completions
+RUN mkdir -p /output/DEBIAN
+
+COPY ${RESTIC_DIR}/restic /output/usr/bin/
+# restic ships only the bare binary in its release assets; build_debian.sh
+# generates the man pages and completions with `restic generate` before the
+# image is built.
+COPY generated/man/ /output/usr/share/man/man1/
+COPY generated/restic.bash /output/usr/share/bash-completion/completions/restic
+COPY generated/restic.fish /output/usr/share/fish/vendor_completions.d/restic.fish
+COPY generated/_restic /output/usr/share/zsh/vendor-completions/_restic
+RUN chmod 755 /output/usr/bin/restic
+RUN gzip -9n /output/usr/share/man/man1/*.1
+COPY output/DEBIAN/control /output/DEBIAN/
+COPY output/DEBIAN/postinst /output/DEBIAN/postinst
+RUN chmod 755 /output/DEBIAN/postinst
+COPY output/copyright /output/usr/share/doc/restic/
+COPY output/changelog.Debian /output/usr/share/doc/restic/
+COPY output/README.md /output/usr/share/doc/restic/
+
+RUN sed -i "s/DIST/$DEBIAN_DIST/" /output/usr/share/doc/restic/changelog.Debian
+RUN sed -i "s/FULL_VERSION/$FULL_VERSION/" /output/usr/share/doc/restic/changelog.Debian
+RUN sed -i "s/DIST/$DEBIAN_DIST/" /output/DEBIAN/control
+RUN sed -i "s/restic_VERSION/$restic_VERSION/" /output/DEBIAN/control
+RUN sed -i "s/BUILD_VERSION/$BUILD_VERSION/" /output/DEBIAN/control
+RUN sed -i "s/SUPPORTED_ARCHITECTURES/$ARCH/" /output/DEBIAN/control
+
+# Normalise permissions (files arrive from the host with the builder's umask)
+RUN find /output/usr -type f -exec chmod 644 {} + && chmod 755 /output/usr/bin/restic
+
+RUN dpkg-deb --build /output /restic_${FULL_VERSION}.deb

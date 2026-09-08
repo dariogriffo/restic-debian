@@ -1,0 +1,32 @@
+Source: restic
+Section: admin
+Priority: optional
+Maintainer: Dario Griffo <dariogriffo@gmail.com>
+Build-Depends: debhelper-compat (= 13), wget, ca-certificates, bzip2, gnupg
+Standards-Version: 4.6.2
+Homepage: https://restic.net
+Rules-Requires-Root: no
+
+Package: restic
+Architecture: amd64 arm64 armhf i386 ppc64el s390x riscv64
+Depends: ${misc:Depends}
+Suggests: ca-certificates, fuse3 | fuse
+Description: backup program with deduplication and encryption
+ restic is a backup program that is fast, efficient and secure. It
+ deduplicates data at the chunk level, so unchanged content is never stored
+ twice, and encrypts and authenticates everything on the client before it
+ leaves the machine.
+ .
+ Backups can be stored on:
+ .
+  - a local directory
+  - SFTP and HTTP REST servers
+  - Amazon S3 and S3-compatible services
+  - OpenStack Swift
+  - Backblaze B2
+  - Microsoft Azure Blob Storage
+  - Google Cloud Storage
+  - any backend reachable through rclone
+ .
+ Snapshots are append-only and can be mounted as a filesystem for browsing and
+ restoring individual files.

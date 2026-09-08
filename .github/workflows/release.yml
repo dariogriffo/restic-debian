@@ -1,0 +1,108 @@
+name: Build restic for Debian
+
+on:
+  workflow_dispatch:
+    inputs:
+      restic_version:
+        description: The version of restic to build.
+        type: string
+        required: true
+      build_version:
+        description: The build version.
+        type: string
+        required: true
+      architecture:
+        description: Architecture to build (amd64, arm64, armhf, i386, ppc64el, s390x, riscv64, or 'all' for all architectures)
+        type: choice
+        default: 'all'
+        options:
+          - 'all'
+          - 'amd64'
+          - 'arm64'
+          - 'armhf'
+          - 'i386'
+          - 'ppc64el'
+          - 's390x'
+          - 'riscv64'
+
+permissions:
+  contents: write
+
+jobs:
+  build-restic:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout restic-debian
+        uses: actions/checkout@v4
+
+      - name: Validate upstream license permits paid distribution
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./validate_license.sh ${{ inputs.restic_version }}
+
+      - name: Build restic
+        # GH_TOKEN lets verify_download.sh query the attestation API without
+        # hitting the anonymous rate limit; gh is preinstalled on the runner.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./build.sh ${{ inputs.restic_version }} ${{ inputs.build_version }} ${{ inputs.architecture }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact
+          path: restic_*.deb
+
+  build-src:
+    name: Build Source Packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout restic-debian
+        uses: actions/checkout@v4
+
+      - name: Install dpkg-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends dpkg-dev devscripts wget ca-certificates gnupg
+
+      - name: Build source packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./build_src.sh ${{ inputs.restic_version }} ${{ inputs.build_version }}
+
+      - name: Upload Source Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-artifact
+          path: |
+            restic_*.dsc
+            restic_*.orig.tar.gz
+            restic_*.debian.tar.xz
+
+  release-restic:
+    name: Release restic for Debian
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: [build-restic, build-src]
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifact
+
+      - name: Download Source Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: source-artifact
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          files: |
+            restic_*.deb
+            restic_*.dsc
+            restic_*.orig.tar.gz
+            restic_*.debian.tar.xz
+          name: ${{ inputs.restic_version }}+${{ inputs.build_version }}
+          tag_name: ${{ inputs.restic_version }}+${{ inputs.build_version }}
+          fail_on_unmatched_files: true

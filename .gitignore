@@ -1,0 +1,24 @@
+# .deb Packages
+*.deb
+
+# Upstream release binaries and their extracted contents
+*.bz2
+restic-[0-9]*-linux-*/
+.generate/
+
+# Man pages and shell completions generated at build time from the restic binary
+generated/
+
+# debian/rules scratch directory
+.restic-build/
+
+# Source package artifacts
+*.dsc
+*.orig.tar.gz
+*.debian.tar.xz
+*.buildinfo
+*.changes
+restic-[0-9]*/
+
+.idea/*
+.DS_Store
