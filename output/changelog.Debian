@@ -1,4 +1,4 @@
-restic (FULL_VERSION) DIST; urgency=low
+restic (FULL_VERSION) stable; urgency=low
 
   * New upstream release, packaged from the official upstream linux binary
     published at https://github.com/restic/restic/releases

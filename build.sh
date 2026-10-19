@@ -12,5 +12,4 @@ if [ -z "$restic_VERSION" ] || [ -z "$BUILD_VERSION" ]; then
 fi
 
 ./build_debian.sh "$restic_VERSION" "$BUILD_VERSION" "$ARCH"
-./build_ubuntu.sh "$restic_VERSION" "$BUILD_VERSION" "$ARCH"
 ./build_src.sh "$restic_VERSION" "$BUILD_VERSION"

@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Dario Griffo <dariogriffo@gmail.com>
 Homepage: https://restic.net
 Package: restic
-Version: restic_VERSION-BUILD_VERSION~DIST
+Version: restic_VERSION-BUILD_VERSION~griffo
 Architecture: SUPPORTED_ARCHITECTURES
 Depends: 
 Suggests: ca-certificates, fuse3 | fuse
