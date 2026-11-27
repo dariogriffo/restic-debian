@@ -6,7 +6,6 @@ Homepage: https://restic.net
 Package: restic
 Version: restic_VERSION-BUILD_VERSION~griffo
 Architecture: SUPPORTED_ARCHITECTURES
-Depends: 
 Suggests: ca-certificates, fuse3 | fuse
 Description: backup program with deduplication and encryption
  restic is a backup program that is fast, efficient and secure. It
